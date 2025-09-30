@@ -1,33 +1,68 @@
 version: '3.8'
 
 services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.frontend
+      args:
+        NODE_ENV: development
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - REACT_APP_API_URL=http://api:8000
+      - REACT_APP_SUPABASE_URL=${SUPABASE_URL}
+      - REACT_APP_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+    depends_on:
+      - api
+
   api:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
     ports:
       - "8000:8000"
     volumes:
-      - ./temp:/app/temp
+      - .:/app
+      - ./data:/app/data
     environment:
+      - ENVIRONMENT=development
       - CEREBRAS_API_KEY=${CEREBRAS_API_KEY}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_KEY=${SUPABASE_KEY}
-      - APP_ENV=${APP_ENV}
-      - DEBUG=${DEBUG}
+      - SECRET_KEY=${SECRET_KEY}
+      - REDIS_URL=redis://redis:6379/0
     depends_on:
-      - database
+      - redis
 
-  database:
-    image: postgres:15
-    environment:
-      POSTGRES_DB: cerebras_app
-      POSTGRES_USER: cerebras_user
-      POSTGRES_PASSWORD: cerebras_password
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+  redis:
+    image: redis:alpine
     ports:
-      - "5432:5432"
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf:/etc/nginx/conf.d
+      - ./nginx/certs:/etc/nginx/certs
+      - ./nginx/logs:/var/log/nginx
+      - ./frontend/build:/usr/share/nginx/html
+    depends_on:
+      - frontend
+      - api
 
 volumes:
-  postgres_data:
+  redis_data:
