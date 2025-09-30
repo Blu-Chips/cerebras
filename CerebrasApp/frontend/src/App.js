@@ -1,0 +1,183 @@
+import React, { useState } from 'react';
+import axios from 'axios';
+import { Bar } from 'react-chartjs-2';
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
+
+function App() {
+  const [file, setFile] = useState(null);
+  const [transactions, setTransactions] = useState([]);
+  const [categories, setCategories] = useState({});
+  const [advice, setAdvice] = useState('');
+  const [savingsMatrix, setSavingsMatrix] = useState({});
+  const [summary, setSummary] = useState({});
+  const [selectedModel, setSelectedModel] = useState('llama-4-scout-17b-16e-instruct');
+
+  const handleFileChange = (e) => {
+    setFile(e.target.files[0]);
+  };
+
+  const handleUpload = async () => {
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await axios.post('/api/upload-statement/', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      
+      // Extract transactions
+      const transactionsResponse = await axios.post('/api/analyze-transactions/', {
+        file_path: response.data.temp_path,
+        model_name: selectedModel
+      });
+      
+      setTransactions(transactionsResponse.data.transactions);
+      setCategories(transactionsResponse.data.categories);
+      setAdvice(transactionsResponse.data.advice);
+      setSavingsMatrix(transactionsResponse.data.savings_matrix);
+      
+      // Get summary
+      const summaryResponse = await axios.get('/api/transaction-summary/', {
+        params: { file_path: response.data.temp_path }
+      });
+      
+      setSummary(summaryResponse.data);
+    } catch (error) {
+      console.error('Error uploading file:', error);
+    }
+  };
+
+  const handleDownloadExcel = async () => {
+    try {
+      const response = await axios.post('/api/convert-to-excel/', {
+        file_path: transactions.file_path
+      }, { responseType: 'blob' });
+      
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'bank_statement.xlsx');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      console.error('Error downloading Excel file:', error);
+    }
+  };
+
+  const chartData = {
+    labels: Object.keys(categories),
+    datasets: [
+      {
+        label: 'Debits',
+        data: Object.values(categories).map(() => Math.random() * 1000), // Placeholder data
+        backgroundColor: 'rgba(255, 99, 132, 0.5)',
+      },
+      {
+        label: 'Credits',
+        data: Object.values(categories).map(() => Math.random() * 1000), // Placeholder data
+        backgroundColor: 'rgba(54, 162, 235, 0.5)',
+      },
+    ],
+  };
+
+  const chartOptions = {
+    responsive: true,
+    plugins: {
+      legend: {
+        position: 'top',
+      },
+      title: {
+        display: true,
+        text: 'Transaction Summary by Category',
+      },
+    },
+  };
+
+  return (
+    <div className="App">
+      <header className="App-header">
+        <h1>Cerebras Bank Statement Analyzer</h1>
+      </header>
+      
+      <main>
+        <section className="upload-section">
+          <h2>Upload Bank Statement</h2>
+          <input type="file" accept=".pdf" onChange={handleFileChange} />
+          <button onClick={handleUpload}>Analyze Statement</button>
+        </section>
+        
+        <section className="model-selection">
+          <h2>Select AI Model</h2>
+          <select value={selectedModel} onChange={(e) => setSelectedModel(e.target.value)}>
+            <option value="llama-4-scout-17b-16e-instruct">Llama 4 Scout</option>
+            <option value="llama3.1-8b">Llama 3.1 8B</option>
+            <option value="llama-3.3-70b">Llama 3.3 70B</option>
+            <option value="qwen-3-32b">Qwen 3 32B</option>
+          </select>
+        </section>
+        
+        {summary && (
+          <section className="summary-section">
+            <h2>Transaction Summary</h2>
+            <p>Total Transactions: {summary.total_transactions}</p>
+            <p>Total Debits: {summary.debits?.count} (${summary.debits?.total_amount})</p>
+            <p>Total Credits: {summary.credits?.count} (${summary.credits?.total_amount})</p>
+          </section>
+        )}
+        
+        {advice && (
+          <section className="advice-section">
+            <h2>Financial Advice</h2>
+            <p>{advice}</p>
+          </section>
+        )}
+        
+        {Object.keys(categories).length > 0 && (
+          <section className="chart-section">
+            <h2>Transaction Analysis</h2>
+            <Bar data={chartData} options={chartOptions} />
+          </section>
+        )}
+        
+        {savingsMatrix && Object.keys(savingsMatrix).length > 0 && (
+          <section className="savings-section">
+            <h2>Savings Projections</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>Strategy</th>
+                  <th>Monthly Savings</th>
+                  <th>Annual Savings</th>
+                  <th>ROI Projection</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(savingsMatrix).map(([strategy, data]) => (
+                  <tr key={strategy}>
+                    <td>{strategy.charAt(0).toUpperCase() + strategy.slice(1)}</td>
+                    <td>${data.monthly_savings}</td>
+                    <td>${data.annual_savings}</td>
+                    <td>{data.roi_projection}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        )}
+        
+        <section className="download-section">
+          <h2>Download Results</h2>
+          <button onClick={handleDownloadExcel}>Download Excel Statement</button>
+          <button onClick={() => window.print()}>Download Analysis Report</button>
+        </section>
+      </main>
+    </div>
+  );
+}
+
+export default App;
