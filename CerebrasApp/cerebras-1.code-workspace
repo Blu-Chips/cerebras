@@ -1,0 +1,11 @@
+{
+	"folders": [
+		{
+			"path": "../cerebras-1"
+		},
+		{
+			"path": "."
+		}
+	],
+	"settings": {}
+}
