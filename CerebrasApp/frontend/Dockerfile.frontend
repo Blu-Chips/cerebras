@@ -2,10 +2,18 @@
 FROM node:18-alpine as build
 
 WORKDIR /app
+
+# Copy package files
 COPY package*.json ./
+
+# Clean npm cache and install dependencies
+RUN npm cache clean --force
 RUN npm install
 
+# Copy application code
 COPY . .
+
+# Build the application
 ARG NODE_ENV
 ENV NODE_ENV=$NODE_ENV
 RUN npm run build
@@ -14,10 +22,16 @@ RUN npm run build
 FROM node:18-alpine
 
 WORKDIR /app
+
+# Copy built files
 COPY --from=build /app/build ./build
 COPY --from=build /app/package*.json ./
 
+# Install production dependencies only
 RUN npm install --production
 
+# Expose port
 EXPOSE 3000
+
+# Start the application
 CMD ["npm", "start"]
