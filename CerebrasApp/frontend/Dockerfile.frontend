@@ -1,5 +1,4 @@
 # ---------- Build stage ----------
-# Node 22 already includes npm 11.x, which satisfies the version requirement.
 FROM node:22-alpine AS build
 
 WORKDIR /app
@@ -10,8 +9,8 @@ RUN npm install -g npm@latest
 # Copy only the package manifest files – this layer is cached unless they change
 COPY package*.json ./
 
-# Install all dependencies (use npm install because we have no lockfile)
-RUN npm install
+# Install all dependencies, ignoring strict peer‑dependency checks
+RUN npm install --legacy-peer-deps   # <-- changed line
 
 # Copy the rest of the source code
 COPY . .
@@ -29,8 +28,7 @@ COPY --from=build /app/build ./build
 COPY --from=build /app/package*.json ./
 COPY --from=build /app/node_modules ./node_modules
 
-# Expose the port the app will be served on
 EXPOSE 3000
 
-# Serve the static build with the tiny `serve` package (installed as a dev‑dependency of create‑react‑app)
+# Serve the static build
 CMD ["npx", "serve", "-s", "build", "-l", "3000"]
