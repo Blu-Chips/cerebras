@@ -22,12 +22,14 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Copy built files
-COPY --from=build /app/build ./build
-COPY --from=build /app/package*.json ./
+# Copy package files
+COPY package*.json ./
 
-# Install production dependencies only
-RUN npm ci --only=production
+# Install dependencies
+RUN npm install
+
+# Copy application code
+COPY . .
 
 # Expose port
 EXPOSE 3000
