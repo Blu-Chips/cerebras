@@ -50,3 +50,15 @@ Thumbs.db
 # Temporary files
 tmp/
 temp/
+
+# Exclude everything that should not be sent to the Docker build context
+node_modules
+npm-debug.log
+Dockerfile*
+.git
+.gitignore
+*.md
+*.log
+*.env
+.idea
+.vscode
