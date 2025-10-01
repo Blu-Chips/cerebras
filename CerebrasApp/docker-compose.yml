@@ -21,7 +21,7 @@ services:
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.frontend
     environment:
       - CEREBRAS_API_KEY=${CEREBRAS_API_KEY}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
