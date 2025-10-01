@@ -1,6 +1,11 @@
 # ---------- Build stage ----------
-# Node 22‑alpine already ships with npm 11.x, so we don’t need a global upgrade.
+# Node 22‑alpine already ships with npm 11.x – no need for a global upgrade.
 FROM node:22-alpine AS build
+
+# Metadata (optional but useful)
+LABEL maintainer="James <james@example.com>"
+LABEL description="Frontend build for Cerebras Bank‑Statement Analyzer"
+LABEL version="1.0.0"
 
 WORKDIR /app
 
@@ -21,9 +26,7 @@ RUN if [ -f package-lock.json ]; then \
     fi
 
 # -----------------------------------------------------------------
-# 3️⃣  Copy the rest of the source code.
-#     The .dockerignore file (shown above) excludes node_modules,
-#     git data, logs, etc., so the image stays lean.
+# 3️⃣  Copy the rest of the source code (respect .dockerignore)
 # -----------------------------------------------------------------
 COPY . .
 
@@ -32,15 +35,23 @@ COPY . .
 # -----------------------------------------------------------------
 RUN npm run build
 
+# -----------------------------------------------------------------
+# 5️⃣  Remove dev‑dependencies to keep the final image small
+# -----------------------------------------------------------------
+RUN npm prune --production
+
 # ---------- Production stage ----------
 FROM node:22-alpine AS runtime
 
 WORKDIR /app
 
+# Create a non‑root user (node user exists in the official image)
+USER node
+
 # -----------------------------------------------------------------
 # Copy only the artefacts needed at runtime:
 #   • compiled static files (build/)
-#   • the exact node_modules that were installed in the build stage
+#   • the production‑only node_modules
 #   • package.json (useful for debugging/version info)
 # -----------------------------------------------------------------
 COPY --from=build /app/build ./build
@@ -48,6 +59,10 @@ COPY --from=build /app/package*.json ./
 COPY --from=build /app/node_modules ./node_modules
 
 EXPOSE 3000
+
+# Simple health‑check (Docker will call this every 30 s)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s \
+  CMD wget -qO- http://localhost:3000 || exit 1
 
 # Serve the static build with the tiny `serve` package (installed as a dev‑dependency)
 CMD ["npx", "serve", "-s", "build", "-l", "3000"]
