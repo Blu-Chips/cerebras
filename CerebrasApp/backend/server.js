@@ -1,8 +1,7 @@
-import express from 'express';
-import cors from 'cors';
-import multer from 'multer';
-import { parsePdf } from './utils/parsePdf.js';
-import { parseCsv } from './utils/parseCsv.js';
+const express = require('express');
+const cors = require('cors');
+const multer = require('multer');
+const { parseCsv } = require('./utils/parseCsv');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -34,7 +33,7 @@ app.get('/', (req, res) => {
   res.send('Cerebras Bank-Statement Analyzer Backend');
 });
 
-// Updated analysis endpoint
+// Dynamic import for pdf-parse (fixes module conflict)
 app.post('/api/analyze', upload.single('statement'), async (req, res) => {
   try {
     if (!req.file) {
@@ -45,8 +44,10 @@ app.post('/api/analyze', upload.single('statement'), async (req, res) => {
     let transactions = [];
 
     if (mimetype === 'application/pdf') {
-      const text = await parsePdf(buffer);
-      transactions = [{ rawText: text.substring(0, 500) + '...' }];
+      // Load pdf-parse only when needed (CommonJS-compatible)
+      const pdfParse = (await import('pdf-parse')).default;
+      const data = await pdfParse(buffer);
+      transactions = [{ rawText: data.text.substring(0, 500) + '...' }];
     } else if (mimetype.includes('csv')) {
       transactions = await parseCsv(buffer);
     }
@@ -74,6 +75,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: err.message });
 });
 
+// Start server (this will now work)
 app.listen(PORT, () => {
   console.log(`✅ Backend running on http://localhost:${PORT}`);
 });
