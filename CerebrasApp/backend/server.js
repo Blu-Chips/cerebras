@@ -2,6 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 const { parseCsv } = require('./utils/parseCsv');
+const { extractFromCsv } = require('./utils/extractTransactions');
+const { extractFromPdf } = require('./utils/extractTransactions');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -47,9 +49,9 @@ app.post('/api/analyze', upload.single('statement'), async (req, res) => {
       // Load pdf-parse only when needed (CommonJS-compatible)
       const pdfParse = (await import('pdf-parse')).default;
       const data = await pdfParse(buffer);
-      transactions = [{ rawText: data.text.substring(0, 500) + '...' }];
+      transactions = extractFromPdf(data);
     } else if (mimetype.includes('csv')) {
-      transactions = await parseCsv(buffer);
+      transactions = extractFromCsv(await parseCsv(buffer));
     }
 
     res.json({
