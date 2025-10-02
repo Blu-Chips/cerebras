@@ -39,6 +39,7 @@
   },
   "devDependencies": {
     "ajv": "^8.17.1",
-    "react-scripts": "^5.0.1"
+    "react-scripts": "^5.0.1",
+    "schema-utils": "^4.3.3"
   }
 }
