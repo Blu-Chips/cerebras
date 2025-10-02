@@ -7,11 +7,11 @@ LABEL version="1.0.0"
 
 WORKDIR /app
 
-# 1️⃣  Copy only the manifest files (package.json + lockfile)
+# 1️⃣  Copy only the manifest files (package.json + lockfile if any)
 COPY package*.json ./
 
-# 2️⃣  Install **all** dependencies (dev + prod) deterministically.
-RUN npm ci --prefer-offline --no-audit --no-fund
+# 2️⃣  Install **all** dependencies (dev + prod) – use npm install so the lockfile is regenerated
+RUN npm install --legacy-peer-deps --prefer-offline --no-audit --no-fund
 
 # 3️⃣  Copy the rest of the source (respect .dockerignore)
 COPY . .
