@@ -1,7 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
-const path = require('path');
+const { parsePdf } = require('./utils/parsePdf');
+const { parseCsv } = require('./utils/parseCsv'); // ← New import
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -10,17 +11,16 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
-// Multer config: memory storage + validation
+// Multer config
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowedTypes = [
       'application/pdf',
       'text/csv',
-      'application/vnd.ms-excel' // Legacy Excel CSV
+      'application/vnd.ms-excel'
     ];
-
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
@@ -34,29 +34,39 @@ app.get('/', (req, res) => {
   res.send('Cerebras Bank-Statement Analyzer Backend');
 });
 
-// ✅ File upload endpoint with validation
-app.post('/api/analyze', upload.single('statement'), (req, res) => {
+// ✅ Updated analysis endpoint
+app.post('/api/analyze', upload.single('statement'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    const { originalname, size, mimetype } = req.file;
+    const { originalname, size, mimetype, buffer } = req.file;
+    let transactions = [];
 
-    // Return success + file info
+    // Parse based on file type
+    if (mimetype === 'application/pdf') {
+      const text = await parsePdf(buffer);
+      // PDF parsing logic will be added in Task 2.3
+      transactions = [{ rawText: text.substring(0, 500) + '...' }];
+    } else if (mimetype.includes('csv')) {
+      transactions = await parseCsv(buffer);
+    }
+
+    // Return parsed transactions
     res.json({
-      message: 'File uploaded successfully',
+      message: 'File parsed successfully',
       filename: originalname,
-      size: `${(size / 1024).toFixed(2)} KB`,
       type: mimetype,
-      readyForProcessing: true
+      transactions: transactions.slice(0, 5), // First 5 transactions
+      totalTransactions: transactions.length
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// Error handler for multer
+// Error handler
 app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {
     if (err.code === 'LIMIT_FILE_SIZE') {
