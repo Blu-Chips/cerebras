@@ -13,13 +13,19 @@ async function parsePdf(buffer) {
     const tempPath = path.join(__dirname, 'temp.pdf');
     fs.writeFileSync(tempPath, buffer);
     
-    // Parse from disk (reliable method)
-    const data = await pdf(tempPath);
-    
-    // Clean up
-    fs.unlinkSync(tempPath);
-    
-    return data.text;
+    // Try parsing without password first
+    try {
+      const data = await pdf(tempPath);
+      fs.unlinkSync(tempPath);
+      return data.text;
+    } catch (error) {
+      // Handle password-protected PDFs
+      if (error.message.includes('No password given')) {
+        fs.unlinkSync(tempPath);
+        throw new Error('PDF is password-protected. Please remove password and try again.');
+      }
+      throw error;
+    }
   } catch (error) {
     // Always clean up temp file
     try {
