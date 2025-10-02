@@ -1,8 +1,8 @@
-const express = require('express');
-const cors = require('cors');
-const multer = require('multer');
-const { parsePdf } = require('./utils/parsePdf');
-const { parseCsv } = require('./utils/parseCsv'); // ← New import
+import express from 'express';
+import cors from 'cors';
+import multer from 'multer';
+import { parsePdf } from './utils/parsePdf.js';
+import { parseCsv } from './utils/parseCsv.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -34,7 +34,7 @@ app.get('/', (req, res) => {
   res.send('Cerebras Bank-Statement Analyzer Backend');
 });
 
-// ✅ Updated analysis endpoint
+// Updated analysis endpoint
 app.post('/api/analyze', upload.single('statement'), async (req, res) => {
   try {
     if (!req.file) {
@@ -44,21 +44,18 @@ app.post('/api/analyze', upload.single('statement'), async (req, res) => {
     const { originalname, size, mimetype, buffer } = req.file;
     let transactions = [];
 
-    // Parse based on file type
     if (mimetype === 'application/pdf') {
       const text = await parsePdf(buffer);
-      // PDF parsing logic will be added in Task 2.3
       transactions = [{ rawText: text.substring(0, 500) + '...' }];
     } else if (mimetype.includes('csv')) {
       transactions = await parseCsv(buffer);
     }
 
-    // Return parsed transactions
     res.json({
       message: 'File parsed successfully',
       filename: originalname,
       type: mimetype,
-      transactions: transactions.slice(0, 5), // First 5 transactions
+      transactions: transactions.slice(0, 5),
       totalTransactions: transactions.length
     });
   } catch (error) {
