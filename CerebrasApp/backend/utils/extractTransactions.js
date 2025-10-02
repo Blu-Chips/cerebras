@@ -87,6 +87,11 @@ function extractFromCsv(csvData) {
  * Extract transactions from PDF text using regex
  */
 function extractFromPdf(pdfText) {
+  // DEBUG: Log first 500 characters of extracted text
+  console.log('🔍 Extracted PDF text preview:');
+  console.log(pdfText.substring(0, 500));
+  console.log('----------------------------------------');
+
   const transactions = [];
   
   // Common bank statement patterns
