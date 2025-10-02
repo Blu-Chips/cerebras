@@ -1,182 +1,115 @@
+const { parse } = require('csv-parse/sync');
+
 /**
- * Normalize transaction data from various bank statement formats
- * @param {Object} transaction - Raw transaction object
- * @returns {Object} - Standardized transaction
+ * Helper – normalize a raw transaction object
  */
-function normalizeTransaction(transaction) {
-  // Handle different date formats
-  const date = parseDate(
-    transaction.Date || 
-    transaction['Transaction Date'] || 
-    transaction['Posting Date']
-  );
-  
-  // Handle different description fields
-  const description = 
-    transaction.Description || 
-    transaction.Merchant || 
-    transaction.Narrative;
-  
-  // Handle different amount formats
-  const amount = parseAmount(
-    transaction.Amount || 
-    transaction['Transaction Amount'] || 
-    transaction.Value
-  );
+function normalizeTransaction(tx) {
+  // ---- Date ----
+  const isoDate = (() => {
+    const m = tx.date?.match(/(\d{2})[\/\-](\d{2})[\/\-](\d{4})/);
+    if (!m) return null;
+    // Assume DD/MM/YYYY (common in MPESA statements)
+    const [_, dd, mm, yyyy] = m;
+    return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
+  })();
+
+  // ---- Amount ----
+  const amount = (() => {
+    if (!tx.amount) return 0;
+    // Remove commas, spaces, currency symbols
+    const clean = tx.amount.replace(/[^\d\.\-]/g, '');
+    return parseFloat(clean) || 0;
+  })();
 
   return {
-    date,
-    description,
+    date: isoDate,
+    description: (tx.description || tx.desc || '').trim(),
     amount,
-    currency: 'USD' // Will be detected later
+    currency: 'KES' // MPESA statements are always KES
   };
 }
 
 /**
- * Parse date string into ISO format (YYYY-MM-DD)
- */
-function parseDate(dateStr) {
-  if (!dateStr) return null;
-  
-  // Handle MM/DD/YYYY
-  const mdy = dateStr.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-  if (mdy) {
-    const month = mdy[1].padStart(2, '0');
-    const day = mdy[2].padStart(2, '0');
-    const year = mdy[3];
-    return `${year}-${month}-${day}`;
-  }
-  
-  // Handle DD/MM/YYYY
-  const dmy = dateStr.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-  if (dmy) {
-    const day = dmy[1].padStart(2, '0');
-    const month = dmy[2].padStart(2, '0');
-    const year = dmy[3];
-    return `${year}-${month}-${day}`;
-  }
-  
-  return dateStr;
-}
-
-/**
- * Parse amount string into number
- */
-function parseAmount(amountStr) {
-  if (!amountStr) return 0;
-  
-  // Remove non-numeric except decimal and minus
-  let clean = amountStr.replace(/[^\d\.\-]/g, '');
-  
-  // Handle cases like "1,000.00"
-  clean = clean.replace(/,/g, '');
-  
-  return parseFloat(clean) || 0;
-}
-
-/**
- * Extract transactions from CSV data
+ * CSV extraction – already works (kept unchanged)
  */
 function extractFromCsv(csvData) {
-  return csvData
-    .filter(tx => tx.Date || tx['Transaction Date'])
-    .map(normalizeTransaction);
+  const records = parse(csvData, {
+    columns: true,
+    skip_empty_lines: true,
+    trim: true
+  });
+  return records.map(normalizeTransaction);
 }
 
 /**
- * Extract transactions from PDF text using regex
+ * PDF extraction – MPESA‑specific patterns + fallback scanner
  */
 function extractFromPdf(pdfText) {
-  // DEBUG: Show first 500 chars of extracted PDF
-  console.log('🔍 PDF Text Preview:');
+  // ---------- DEBUG: show a preview of the raw text ----------
+  console.log('🔍 PDF Text Preview (first 500 chars):');
   console.log(pdfText.substring(0, 500));
-  console.log('--- End of Preview ---');
+  console.log('--- End of Preview ---\n');
 
   const transactions = [];
-  
-  // Common bank statement patterns
-  const patterns = [
-    // Pattern 1: Date | Description | Amount
-    /(\d{2}\/\d{2}\/\d{4})\s+([A-Za-z0-9 ]+)\s+([-\d.,]+)/g,
-    
-    // Pattern 2: Date,Description,Amount (CSV-like in PDF)
-    /(\d{2}\/\d{2}\/\d{4}),([A-Za-z0-9 ]+),([-\d.,]+)/g,
-    
-    // Pattern 3: Date Description Amount (space-delimited)
-    /(\d{2}\/\d{2}\/\d{4})\s+([^\d]+)\s+([-\d.,]+)/g
-  ];
-  
-  for (const pattern of patterns) {
-    let match;
-    while ((match = pattern.exec(pdfText)) !== null) {
-      transactions.push({
-        date: match[1],
-        description: match[2].trim(),
-        amount: match[3]
-      });
-    }
-  }
-  
-  return transactions.map(normalizeTransaction);
-}
 
-/**
- * Extract transactions from MPESA PDF statements
- */
-function extractFromPdf(pdfText) {
-  const transactions = [];
-  
-  // MPESA-specific patterns (tested with common formats)
+  // ---------- MPESA‑specific regex patterns ----------
   const patterns = [
-    // Pattern 1: Standard MPESA format (Date | Description | Amount)
-    /(\d{2}\/\d{2}\/\d{4})\s+([^\d]+?)\s+([-\d,]+\.\d{2})/g,
-    
-    // Pattern 2: With transaction ID (common in statements)
-    /(\d{2}\/\d{2}\/\d{4}).*?(\d{10}).*?([^\d]+?)\s+([-\d,]+\.\d{2})/g,
-    
-    // Pattern 3: Compact format (Date Description Amount)
-    /(\d{2}\/\d{2}\/\d{4})\s+([A-Za-z0-9 ]+)\s+([-\d,]+\.\d{2})/g,
-    
-    // Pattern 4: With currency code (KES)
-    /(\d{2}\/\d{2}\/\d{4})\s+([^\d]+?)\s+([-\d,]+\.\d{2})\s+KES/g
+    // Pattern A: Date   Description   Amount
+    // Example: 01/08/2025  AIRTIME 2547XXXXXX109  -50.00
+    /(\d{2}[\/\-]\d{2}[\/\-]\d{4})\s+([A-Za-z0-9\s]+?)\s+([-\d,]+\.\d{2})/g,
+
+    // Pattern B: Date   TransactionID   Description   Amount
+    // Example: 01/08/2025  TXN123456789  AIRTIME  -50.00
+    /(\d{2}[\/\-]\d{2}[\/\-]\d{4})\s+([A-Z0-9]{9,})\s+([A-Za-z0-9\s]+?)\s+([-\d,]+\.\d{2})/g,
+
+    // Pattern C: Date   Description   Amount   KES
+    // Example: 01/08/2025  PAYMENT FROM JOHN  1,500.00  KES
+    /(\d{2}[\/\-]\d{2}[\/\-]\d{4})\s+([A-Za-z0-9\s]+?)\s+([-\d,]+\.\d{2})\s+KES/g
   ];
 
   for (const pattern of patterns) {
     let match;
     while ((match = pattern.exec(pdfText)) !== null) {
-      // Pattern 2 has extra groups
-      const date = match[1];
-      const description = pattern === patterns[1] ? match[3] : match[2];
-      const amount = pattern === patterns[1] ? match[4] : match[3];
-      
+      // Determine which groups we have based on pattern length
+      let date, description, amount;
+      if (match.length === 4) {
+        // Pattern A or C (no transaction ID)
+        [, date, description, amount] = match;
+      } else if (match.length === 5) {
+        // Pattern B (has transaction ID)
+        [, date, /* txnId */ , description, amount] = match;
+      }
+
       transactions.push({
         date,
         description: description.trim(),
-        amount: amount.replace(/,/g, '')
+        amount
       });
     }
   }
 
-  // Fallback: Line-by-line scanning for transactions
+  // ---------- Fallback: line‑by‑line scanner ----------
   if (transactions.length === 0) {
     const lines = pdfText.split('\n');
     for (const line of lines) {
-      const dateMatch = line.match(/(\d{2}\/\d{2}\/\d{4})/);
+      const dateMatch = line.match(/(\d{2}[\/\-]\d{2}[\/\-]\d{4})/);
       const amountMatch = line.match(/([-\d,]+\.\d{2})/);
-      
       if (dateMatch && amountMatch) {
         const date = dateMatch[1];
-        const amount = amountMatch[1].replace(/,/g, '');
+        const amount = amountMatch[1];
+        // Description is everything between date and amount
         const descStart = line.indexOf(date) + date.length;
-        const descEnd = line.indexOf(amount);
+        const descEnd = line.lastIndexOf(amount);
         const description = line.substring(descStart, descEnd).trim();
-        
         transactions.push({ date, description, amount });
       }
     }
   }
 
-  return transactions.map(normalizeTransaction);
+  // ---------- Normalization ----------
+  const normalized = transactions.map(normalizeTransaction);
+  console.log(`✅ Extracted ${normalized.length} transaction(s)`);
+  return normalized;
 }
 
 module.exports = {
