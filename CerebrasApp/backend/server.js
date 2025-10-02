@@ -46,10 +46,10 @@ app.post('/api/analyze', upload.single('statement'), async (req, res) => {
     let transactions = [];
 
     if (mimetype === 'application/pdf') {
-      // Load pdf-parse only when needed (CommonJS-compatible)
-      const pdfParse = (await import('pdf-parse')).default;
-      const data = await pdfParse(buffer);
-      transactions = extractFromPdf(data);
+      // Use fixed parser (no dynamic import needed)
+      const { parsePdf } = require('./utils/parsePdf');
+      const text = await parsePdf(buffer);
+      transactions = extractFromPdf(text);
     } else if (mimetype.includes('csv')) {
       transactions = extractFromCsv(await parseCsv(buffer));
     }
