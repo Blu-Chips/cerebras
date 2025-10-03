@@ -6,12 +6,26 @@ const { Transform } = require('stream');
  * MPESA PDFs do not contain a date in the extracted text → date = null.
  */
 function normalizeTransaction(raw) {
-  const amount = parseFloat((raw.amount || '').replace(/[^\d\.\-]/g, '')) || 0;
+  // ----- Amount handling -------------------------------------------------
+  // raw.amount may be a string (CSV) or a number (PDF parser)
+  let amount;
+  if (typeof raw.amount === 'string') {
+    // Strip any non‑numeric characters (commas, currency symbols, etc.)
+    amount = parseFloat(raw.amount.replace(/[^\d\.\-]/g, '')) || 0;
+  } else {
+    // Already a number (from PDF parser)
+    amount = Number(raw.amount) || 0;
+  }
 
+  // ----- Sign handling --------------------------------------------------
+  // raw.type is set to either "PAID IN" or "PAID OUT" by the PDF parser
+  const signedAmount = raw.type === 'PAID OUT' ? -Math.abs(amount) : Math.abs(amount);
+
+  // ----- Return normalised object ---------------------------------------
   return {
     date: null, // No date info in MPESA PDF text
     description: raw.description?.trim() || '',
-    amount: raw.type === 'PAID OUT' ? -Math.abs(amount) : Math.abs(amount),
+    amount: signedAmount,
     currency: 'KES' // MPESA statements are always Kenyan Shillings
   };
 }
