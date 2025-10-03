@@ -1,60 +1,34 @@
-const csv = require('csv-parser'); // already a dependency
-const { Transform } = require('stream');
+// ...existing imports and normalizeTransaction function...
 
 /**
- * Normalise a raw transaction object.
- * MPESA PDFs do not contain a date in the extracted text → date = null.
+ * PDF extraction – MPESA‑specific logic (now captures the description column)
  */
-function normalizeTransaction(raw) {
-  // ----- Amount handling -------------------------------------------------
-  // raw.amount may be a string (CSV) or a number (PDF parser)
-  let amount;
-  if (typeof raw.amount === 'string') {
-    // Strip any non‑numeric characters (commas, currency symbols, etc.)
-    amount = parseFloat(raw.amount.replace(/[^\d\.\-]/g, '')) || 0;
-  } else {
-    // Already a number (from PDF parser)
-    amount = Number(raw.amount) || 0;
+function extractFromPdf(pdfText) {
+  // ---------- DEBUG ----------
+  console.log('🔍 PDF Text Preview (first 500 chars):');
+  console.log(pdfText.substring(0, 500));
+  console.log('--- End of Preview ---\n');
+
+  // ---------- Locate the detailed‑statement block ----------
+  const detailedIdx = pdfText.indexOf('DETAILED STATEMENT');
+  if (detailedIdx === -1) {
+    console.warn('⚠️  Could not locate "DETAILED STATEMENT" section.');
+    return [];
   }
 
-  // ----- Sign handling --------------------------------------------------
-  // raw.type is set to either "PAID IN" or "PAID OUT" by the PDF parser
-  const signedAmount = raw.type === 'PAID OUT' ? -Math.abs(amount) : Math.abs(amount);
+  const afterHeader = pdfText.slice(detailedIdx);
+  const lines = afterHeader.split('\n')
+    .map(l => l.trim())
+    .filter(l => l.length > 0);
 
-  // ----- Return normalised object ---------------------------------------
-  return {
-    date: null, // No date info in MPESA PDF text
-    description: raw.description?.trim() || '',
-    amount: signedAmount,
-    currencyconst csv = require('csv-parser'); // already a dependency
-const { Transform } = require('stream');
-
-/**
- * Normalise a raw transaction object.
- * MPESA PDFs do not contain a date in the extracted text → date = null.
- */
-function normalizeTransaction(raw) {
-  // ----- Amount handling -------------------------------------------------
-  // raw.amount may be a string (CSV) or a number (PDF parser)
-  let amount;
-  if (typeof raw.amount === 'string') {
-    // Strip any non‑numeric characters (commas, currency symbols, etc.)
-    amount = parseFloat(raw.amount.replace(/[^\d\.\-]/g, '')) || 0;
-  } else {
-    // Already a number (from PDF parser)
-    amount = Number(raw.amount) || 0;
-  }
-
-  // ----- Sign handling --------------------------------------------------
-  // raw.type is set to either "PAID IN" or "PAID OUT" by the PDF parser
-  const signedAmount = raw.type === 'PAID OUT' ? -Math.abs(amount) : Math.abs(amount);
-
-  // ----- Return normalised object ---------------------------------------
-  return {
-    date: null, // No date info in MPESA PDF text
-    description: raw.description?.trim() || '',
-    amount: signedAmount,
-    currency
+  // Known transaction types (exact strings as they appear in the PDF)
+  const transactionTypes = [
+    'Cash Out',
+    'Send Money',
+    'Transaction Reversal',
+    'Pay Bill',
+    'B2C Payment',
+    'KenyaRecharge',
     'OD Repayment',
     'Customer Merchant Payment'
   ];
@@ -128,6 +102,7 @@ function normalizeTransaction(raw) {
   return transactions.map(normalizeTransaction);
 }
 
+// ...existing module.exports...
 module.exports = {
   extractFromCsv,
   extractFromPdf
