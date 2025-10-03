@@ -78,25 +78,42 @@ function extractFromPdf(pdfText) {
     // Skip the header line that contains the column titles
     if (line.startsWith('TRANSACTION TYPE')) continue;
 
-    // Find which transaction type this line belongs to
+    // Identify the transaction type at the start of the line
     const type = transactionTypes.find(t => line.startsWith(t));
     if (!type) continue; // not a transaction row
 
-    // Extract the two numeric columns (PAID IN & PAID OUT)
-    // Replace everything that is not a digit, dot or comma with a space,
-    // then split on whitespace.
-    const numbers = line
+    // -------------------------------------------------
+    // 1️⃣ Insert a space between the two numeric groups.
+    //    The PDF concatenates them, e.g. "0.0025,304.00".
+    //    We split where a digit is followed by another digit
+    //    that is preceded by a comma (the start of the second amount).
+    // -------------------------------------------------
+    const spaced = line.replace(
+      /(\d[\d.,]*)\s*(\d[\d.,]*)$/g, // captures two groups at line end
+      '$1 $2'
+    );
+
+    // 2️⃣ Remove everything that is not a digit, dot, comma or minus,
+    //    then split on whitespace.
+    const parts = spaced
       .replace(/[^\d.,-]/g, ' ')
       .trim()
       .split(/\s+/)
       .filter(Boolean);
 
-    // Expected: [paidIn, paidOut] – sometimes one of them can be "0.00"
-    const paidIn  = numbers[0] || '0';
-    const paidOut = numbers[1] || '0';
+    // After the cleanup we expect:
+    //   parts[0] = PAID IN  (may be "0" or "0.00")
+    //   parts[1] = PAID OUT (may be "0" or "0.00")
+    const paidInRaw  = parts[0] || '0';
+    const paidOutRaw = parts[1] || '0';
 
-    // Credit (PAID IN) – only if amount > 0
-    if (parseFloat(paidIn.replace(/,/g, '')) > 0) {
+    const paidIn  = parseFloat(paidInRaw.replace(/,/g, '')) || 0;
+    const paidOut = parseFloat(paidOutRaw.replace(/,/g, '')) || 0;
+
+    // -------------------------------------------------
+    // 3️⃣ Create separate transaction objects.
+    // -------------------------------------------------
+    if (paidIn > 0) {
       transactions.push({
         type: 'PAID IN',
         description: type,
@@ -104,8 +121,7 @@ function extractFromPdf(pdfText) {
       });
     }
 
-    // Debit (PAID OUT) – only if amount > 0
-    if (parseFloat(paidOut.replace(/,/g, '')) > 0) {
+    if (paidOut > 0) {
       transactions.push({
         type: 'PAID OUT',
         description: type,
