@@ -1,38 +1,38 @@
-const { parse } = require('csv-parse/sync');
+const csv = require('csv-parser'); // already a dependency
+const { Transform } = require('stream');
 
 /**
- * Helper – normalize a raw transaction object
+ * Normalise a raw transaction object.
+ * MPESA PDFs usually do not contain a date in the extracted text,
+ * so we set `date` to null.
  */
-function normalizeTransaction(tx) {
-  // ---- Date ----
-  const isoDate = (() => {
-    const m = tx.date?.match(/(\d{2})[\/\-](\d{2})[\/\-](\d{4})/);
-    if (!m) return null;
-    // Assume DD/MM/YYYY (common in MPESA statements)
-    const [_, dd, mm, yyyy] = m;
-    return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
-  })();
-
-  // ---- Amount ----
-  const amount = (() => {
-    if (!tx.amount) return 0;
-    // Remove commas, spaces, currency symbols
-    const clean = tx.amount.replace(/[^\d\.\-]/g, '');
-    return parseFloat(clean) || 0;
-  })();
+function normalizeTransaction(raw) {
+  const amount = parseFloat(
+    (raw.amount || '').replace(/[^\d\.\-]/g, '') // strip commas, spaces, currency symbols
+  );
 
   return {
-    date: isoDate,
-    description: (tx.description || tx.desc || '').trim(),
-    amount,
-    currency: 'KES' // MPESA statements are always KES
-  };
-}
+    date: null, // No date information in the raw PDF text
+    description: raw.description?.trim() || '',
+    amount: raw.type === 'PAID OUT' ? -Math.abs(amount) : Math.abs(amount),
+    currencyconst csv = require('csv-parser'); // already a dependency
+const { Transform } = require('stream');
 
 /**
- * CSV extraction – already works (kept unchanged)
+ * Normalise a raw transaction object.
+ * MPESA PDFs usually do not contain a date in the extracted text,
+ * so we set `date` to null.
  */
-function extractFromCsv(csvData) {
+function normalizeTransaction(raw) {
+  const amount = parseFloat(
+    (raw.amount || '').replace(/[^\d\.\-]/g, '') // strip commas, spaces, currency symbols
+  );
+
+  return {
+    date: null, // No date information in the raw PDF text
+    description: raw.description?.trim() || '',
+    amount: raw.type === 'PAID OUT' ? -Math.abs(amount) : Math.abs(amount),
+    currency
   const records = parse(csvData, {
     columns: true,
     skip_empty_lines: true,
