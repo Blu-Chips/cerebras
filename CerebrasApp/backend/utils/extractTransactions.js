@@ -26,34 +26,6 @@ function normalizeTransaction(raw) {
     date: null, // No date info in MPESA PDF text
     description: raw.description?.trim() || '',
     amount: signedAmount,
-    currencyconst csv = require('csv-parser'); // already a dependency
-const { Transform } = require('stream');
-
-/**
- * Normalise a raw transaction object.
- * MPESA PDFs do not contain a date in the extracted text → date = null.
- */
-function normalizeTransaction(raw) {
-  // ----- Amount handling -------------------------------------------------
-  // raw.amount may be a string (CSV) or a number (PDF parser)
-  let amount;
-  if (typeof raw.amount === 'string') {
-    // Strip any non‑numeric characters (commas, currency symbols, etc.)
-    amount = parseFloat(raw.amount.replace(/[^\d\.\-]/g, '')) || 0;
-  } else {
-    // Already a number (from PDF parser)
-    amount = Number(raw.amount) || 0;
-  }
-
-  // ----- Sign handling --------------------------------------------------
-  // raw.type is set to either "PAID IN" or "PAID OUT" by the PDF parser
-  const signedAmount = raw.type === 'PAID OUT' ? -Math.abs(amount) : Math.abs(amount);
-
-  // ----- Return normalised object ---------------------------------------
-  return {
-    date: null, // No date info in MPESA PDF text
-    description: raw.description?.trim() || '',
-    amount: signedAmount,
     currency
  * PDF extraction – MPESA‑specific logic
  */
@@ -71,7 +43,9 @@ function extractFromPdf(pdfText) {
   }
 
   const afterHeader = pdfText.slice(detailedIdx);
-  const lines = afterHeader.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  const lines = afterHeader.split('\n')
+    .map(l => l.trim())
+    .filter(l => l.length > 0);
 
   // Known transaction types (exact strings as they appear in the PDF)
   const transactionTypes = [
@@ -97,40 +71,46 @@ function extractFromPdf(pdfText) {
     if (!type) continue; // not a transaction row
 
     // -------------------------------------------------
-    // 1️⃣ Insert a space between the two numeric groups.
-    //    The PDF concatenates them, e.g. "0.0025,304.00".
-    //    We split where a digit is followed by another digit
-    //    that is preceded by a comma (the start of the second amount).
+    // 1️⃣ Extract the two numeric values (PAID IN & PAID OUT)
+    //    The PDF concatenates them, e.g. "0.0025,304.00"
     // -------------------------------------------------
-    const spaced = line.replace(
-      /(\d[\d.,]*)\s*(\d[\d.,]*)$/g, // captures two groups at line end
-      '$1 $2'
-    );
+    const numberMatches = line.match(/-?[\d,]+\.\d+/g) || [];
 
-    // 2️⃣ Remove everything that is not a digit, dot, comma or minus,
-    //    then split on whitespace.
-    const parts = spaced
-      .replace(/[^\d.,-]/g, ' ')
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean);
+    // Guard against malformed rows
+    if (numberMatches.length === 0) continue;
 
-    // After the cleanup we expect:
-    //   parts[0] = PAID IN  (may be "0" or "0.00")
-    //   parts[1] = PAID OUT (may be "0" or "0.00")
-    const paidInRaw  = parts[0] || '0';
-    const paidOutRaw = parts[1] || '0';
+    const paidInRaw  = numberMatches[0] || '0';
+    const paidOutRaw = numberMatches[1] || '0';
 
     const paidIn  = parseFloat(paidInRaw.replace(/,/g, '')) || 0;
     const paidOut = parseFloat(paidOutRaw.replace(/,/g, '')) || 0;
 
     // -------------------------------------------------
-    // 3️⃣ Create separate transaction objects.
+    // 2️⃣ Extract the description (the “details” column)
+    //    Remove the transaction type and the two numbers from the line.
+    //    Whatever remains (trimmed) is the description.
+    // -------------------------------------------------
+    // Remove the type prefix
+    let descriptionPart = line.slice(type.length).trim();
+
+    // Remove the two numeric strings we just captured
+    // (use replace with the exact matched strings to avoid accidental removal)
+    descriptionPart = descriptionPart
+      .replace(paidInRaw, '')
+      .replace(paidOutRaw, '')
+      .trim();
+
+    // If the description ends up empty (some rows have no extra details),
+    // fall back to the transaction type itself.
+    const description = descriptionPart || type;
+
+    // -------------------------------------------------
+    // 3️⃣ Create separate transaction objects for credit & debit
     // -------------------------------------------------
     if (paidIn > 0) {
       transactions.push({
         type: 'PAID IN',
-        description: type,
+        description,
         amount: paidIn
       });
     }
@@ -138,7 +118,7 @@ function extractFromPdf(pdfText) {
     if (paidOut > 0) {
       transactions.push({
         type: 'PAID OUT',
-        description: type,
+        description,
         amount: paidOut
       });
     }
