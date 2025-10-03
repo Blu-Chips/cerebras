@@ -1,115 +1,121 @@
-const { parse } = require('csv-parse/sync');
+const csv = require('csv-parser'); // already a dependency
+const { Transform } = require('stream');
 
 /**
- * Helper – normalize a raw transaction object
+ * Normalise a raw transaction object.
+ * MPESA PDFs do not contain a date in the extracted text → date = null.
  */
-function normalizeTransaction(tx) {
-  // ---- Date ----
-  const isoDate = (() => {
-    const m = tx.date?.match(/(\d{2})[\/\-](\d{2})[\/\-](\d{4})/);
-    if (!m) return null;
-    // Assume DD/MM/YYYY (common in MPESA statements)
-    const [_, dd, mm, yyyy] = m;
-    return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
-  })();
-
-  // ---- Amount ----
-  const amount = (() => {
-    if (!tx.amount) return 0;
-    // Remove commas, spaces, currency symbols
-    const clean = tx.amount.replace(/[^\d\.\-]/g, '');
-    return parseFloat(clean) || 0;
-  })();
+function normalizeTransaction(raw) {
+  const amount = parseFloat((raw.amount || '').replace(/[^\d\.\-]/g, '')) || 0;
 
   return {
-    date: isoDate,
-    description: (tx.description || tx.desc || '').trim(),
-    amount,
-    currency: 'KES' // MPESA statements are always KES
+    date: null, // No date info in MPESA PDF text
+    description: raw.description?.trim() || '',
+    amount: raw.type === 'PAID OUT' ? -Math.abs(amount) : Math.abs(amount),
+    currency: 'KES' // MPESA statements are always Kenyan Shillings
   };
 }
 
 /**
- * CSV extraction – already works (kept unchanged)
+ * CSV extraction – uses csv‑parser (already installed)
  */
-function extractFromCsv(csvData) {
-  const records = parse(csvData, {
-    columns: true,
-    skip_empty_lines: true,
-    trim: true
+function extractFromCsv(csvBuffer) {
+  return new Promise((resolve, reject) => {
+    const results = [];
+    const stream = new Transform({
+      transform(chunk, encoding, callback) {
+        this.push(chunk);
+        callback();
+      }
+    });
+
+    stream
+      .pipe(csv())
+      .on('data', row => results.push(row))
+      .on('end', () => resolve(results.map(normalizeTransaction)))
+      .on('error', reject);
+
+    // Feed the buffer into the stream
+    stream.end(csvBuffer);
   });
-  return records.map(normalizeTransaction);
 }
 
 /**
- * PDF extraction – MPESA‑specific patterns + fallback scanner
+ * PDF extraction – MPESA‑specific logic
  */
 function extractFromPdf(pdfText) {
-  // ---------- DEBUG: show a preview of the raw text ----------
+  // ---------- DEBUG ----------
   console.log('🔍 PDF Text Preview (first 500 chars):');
   console.log(pdfText.substring(0, 500));
   console.log('--- End of Preview ---\n');
 
-  const transactions = [];
+  // ---------- Locate the detailed‑statement block ----------
+  const detailedIdx = pdfText.indexOf('DETAILED STATEMENT');
+  if (detailedIdx === -1) {
+    console.warn('⚠️  Could not locate "DETAILED STATEMENT" section.');
+    return [];
+  }
 
-  // ---------- MPESA‑specific regex patterns ----------
-  const patterns = [
-    // Pattern A: Date   Description   Amount
-    // Example: 01/08/2025  AIRTIME 2547XXXXXX109  -50.00
-    /(\d{2}[\/\-]\d{2}[\/\-]\d{4})\s+([A-Za-z0-9\s]+?)\s+([-\d,]+\.\d{2})/g,
+  const afterHeader = pdfText.slice(detailedIdx);
+  const lines = afterHeader.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
-    // Pattern B: Date   TransactionID   Description   Amount
-    // Example: 01/08/2025  TXN123456789  AIRTIME  -50.00
-    /(\d{2}[\/\-]\d{2}[\/\-]\d{4})\s+([A-Z0-9]{9,})\s+([A-Za-z0-9\s]+?)\s+([-\d,]+\.\d{2})/g,
-
-    // Pattern C: Date   Description   Amount   KES
-    // Example: 01/08/2025  PAYMENT FROM JOHN  1,500.00  KES
-    /(\d{2}[\/\-]\d{2}[\/\-]\d{4})\s+([A-Za-z0-9\s]+?)\s+([-\d,]+\.\d{2})\s+KES/g
+  // Known transaction types (exact strings as they appear in the PDF)
+  const transactionTypes = [
+    'Cash Out',
+    'Send Money',
+    'Transaction Reversal',
+    'Pay Bill',
+    'B2C Payment',
+    'KenyaRecharge',
+    'OD Repayment',
+    'Customer Merchant Payment'
   ];
 
-  for (const pattern of patterns) {
-    let match;
-    while ((match = pattern.exec(pdfText)) !== null) {
-      // Determine which groups we have based on pattern length
-      let date, description, amount;
-      if (match.length === 4) {
-        // Pattern A or C (no transaction ID)
-        [, date, description, amount] = match;
-      } else if (match.length === 5) {
-        // Pattern B (has transaction ID)
-        [, date, /* txnId */ , description, amount] = match;
-      }
+  const transactions = [];
 
+  // ---------- Parse each line ----------
+  for (const line of lines) {
+    // Skip the header line that contains the column titles
+    if (line.startsWith('TRANSACTION TYPE')) continue;
+
+    // Find which transaction type this line belongs to
+    const type = transactionTypes.find(t => line.startsWith(t));
+    if (!type) continue; // not a transaction row
+
+    // Extract the two numeric columns (PAID IN & PAID OUT)
+    // Replace everything that is not a digit, dot or comma with a space,
+    // then split on whitespace.
+    const numbers = line
+      .replace(/[^\d.,-]/g, ' ')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+
+    // Expected: [paidIn, paidOut] – sometimes one of them can be "0.00"
+    const paidIn  = numbers[0] || '0';
+    const paidOut = numbers[1] || '0';
+
+    // Credit (PAID IN) – only if amount > 0
+    if (parseFloat(paidIn.replace(/,/g, '')) > 0) {
       transactions.push({
-        date,
-        description: description.trim(),
-        amount
+        type: 'PAID IN',
+        description: type,
+        amount: paidIn
+      });
+    }
+
+    // Debit (PAID OUT) – only if amount > 0
+    if (parseFloat(paidOut.replace(/,/g, '')) > 0) {
+      transactions.push({
+        type: 'PAID OUT',
+        description: type,
+        amount: paidOut
       });
     }
   }
 
-  // ---------- Fallback: line‑by‑line scanner ----------
-  if (transactions.length === 0) {
-    const lines = pdfText.split('\n');
-    for (const line of lines) {
-      const dateMatch = line.match(/(\d{2}[\/\-]\d{2}[\/\-]\d{4})/);
-      const amountMatch = line.match(/([-\d,]+\.\d{2})/);
-      if (dateMatch && amountMatch) {
-        const date = dateMatch[1];
-        const amount = amountMatch[1];
-        // Description is everything between date and amount
-        const descStart = line.indexOf(date) + date.length;
-        const descEnd = line.lastIndexOf(amount);
-        const description = line.substring(descStart, descEnd).trim();
-        transactions.push({ date, description, amount });
-      }
-    }
-  }
-
-  // ---------- Normalization ----------
-  const normalized = transactions.map(normalizeTransaction);
-  console.log(`✅ Extracted ${normalized.length} transaction(s)`);
-  return normalized;
+  console.log(`✅ Extracted ${transactions.length} transaction(s)`);
+  return transactions.map(normalizeTransaction);
 }
 
 module.exports = {
