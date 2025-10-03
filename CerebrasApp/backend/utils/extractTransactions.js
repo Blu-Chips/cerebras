@@ -26,35 +26,35 @@ function normalizeTransaction(raw) {
     date: null, // No date info in MPESA PDF text
     description: raw.description?.trim() || '',
     amount: signedAmount,
-    currency
- * PDF extraction – MPESA‑specific logic
- */
-function extractFromPdf(pdfText) {
-  // ---------- DEBUG ----------
-  console.log('🔍 PDF Text Preview (first 500 chars):');
-  console.log(pdfText.substring(0, 500));
-  console.log('--- End of Preview ---\n');
+    currencyconst csv = require('csv-parser'); // already a dependency
+const { Transform } = require('stream');
 
-  // ---------- Locate the detailed‑statement block ----------
-  const detailedIdx = pdfText.indexOf('DETAILED STATEMENT');
-  if (detailedIdx === -1) {
-    console.warn('⚠️  Could not locate "DETAILED STATEMENT" section.');
-    return [];
+/**
+ * Normalise a raw transaction object.
+ * MPESA PDFs do not contain a date in the extracted text → date = null.
+ */
+function normalizeTransaction(raw) {
+  // ----- Amount handling -------------------------------------------------
+  // raw.amount may be a string (CSV) or a number (PDF parser)
+  let amount;
+  if (typeof raw.amount === 'string') {
+    // Strip any non‑numeric characters (commas, currency symbols, etc.)
+    amount = parseFloat(raw.amount.replace(/[^\d\.\-]/g, '')) || 0;
+  } else {
+    // Already a number (from PDF parser)
+    amount = Number(raw.amount) || 0;
   }
 
-  const afterHeader = pdfText.slice(detailedIdx);
-  const lines = afterHeader.split('\n')
-    .map(l => l.trim())
-    .filter(l => l.length > 0);
+  // ----- Sign handling --------------------------------------------------
+  // raw.type is set to either "PAID IN" or "PAID OUT" by the PDF parser
+  const signedAmount = raw.type === 'PAID OUT' ? -Math.abs(amount) : Math.abs(amount);
 
-  // Known transaction types (exact strings as they appear in the PDF)
-  const transactionTypes = [
-    'Cash Out',
-    'Send Money',
-    'Transaction Reversal',
-    'Pay Bill',
-    'B2C Payment',
-    'KenyaRecharge',
+  // ----- Return normalised object ---------------------------------------
+  return {
+    date: null, // No date info in MPESA PDF text
+    description: raw.description?.trim() || '',
+    amount: signedAmount,
+    currency
     'OD Repayment',
     'Customer Merchant Payment'
   ];
