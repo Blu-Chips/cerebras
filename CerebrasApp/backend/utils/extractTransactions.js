@@ -1,7 +1,67 @@
 // ...existing imports and normalizeTransaction function...
 
+const csv = require('csv-parser');          // already a dependency
+const { Transform } = require('stream');
+
 /**
- * PDF extraction – MPESA‑specific logic (now captures the description column)
+ * Normalise a raw transaction object.
+ * MPESA PDFs do not contain a date in the extracted text → date = null.
+ */
+function normalizeTransaction(raw) {
+  // ----- Amount handling -------------------------------------------------
+  // raw.amount may be a string (CSV) or a number (PDF parser)
+  let amount;
+  if (typeof raw.amount === 'string') {
+    // Strip any non‑numeric characters (commas, currency symbols, etc.)
+    amount = parseFloat(raw.amount.replace(/[^\d\.\-]/g, '')) || 0;
+  } else {
+    // Already a number (from PDF parser)
+    amount = Number(raw.amount) || 0;
+  }
+
+  // ----- Sign handling --------------------------------------------------
+  // raw.type is set to either "PAID IN" or "PAID OUT" by the PDF parser
+  const signedAmount = raw.type === 'PAID OUT' ? -Math.abs(amount) : Math.abs(amount);
+
+  // ----- Return normalised object ---------------------------------------
+  return {
+    date: null, // No date info in MPESA PDF text
+    description: raw.description?.trim() || '',
+    amount: signedAmount,
+    currency: 'KES' // MPESA statements are always Kenyan Shillings
+  };
+}
+
+/**
+ * CSV extraction – uses csv-parser (already a dependency)
+ * @param {Buffer} csvBuffer - Buffer containing CSV data
+ * @returns {Promise<Array<Object>>} - Normalised transaction objects
+ */
+function extractFromCsv(csvBuffer) {
+  return new Promise((resolve, reject) => {
+    const results = [];
+    const stream = new Transform({
+      transform(chunk, encoding, callback) {
+        this.push(chunk);
+        callback();
+      }
+    });
+
+    stream
+      .pipe(csv())
+      .on('data', row => results.push(row))
+      .on('end', () => resolve(results.map(normalizeTransaction)))
+      .on('error', reject);
+
+    // Feed the buffer into the stream
+    stream.end(csvBuffer);
+  });
+}
+
+/**
+ * PDF extraction – MPESA‑specific logic (captures the description column)
+ * @param {string} pdfText - Text extracted from the PDF (via pdf-parse)
+ * @returns {Array<Object>} - Normalised transaction objects
  */
 function extractFromPdf(pdfText) {
   // ---------- DEBUG ----------
@@ -17,7 +77,8 @@ function extractFromPdf(pdfText) {
   }
 
   const afterHeader = pdfText.slice(detailedIdx);
-  const lines = afterHeader.split('\n')
+  const lines = afterHeader
+    .split('\n')
     .map(l => l.trim())
     .filter(l => l.length > 0);
 
@@ -68,7 +129,6 @@ function extractFromPdf(pdfText) {
     let descriptionPart = line.slice(type.length).trim();
 
     // Remove the two numeric strings we just captured
-    // (use replace with the exact matched strings to avoid accidental removal)
     descriptionPart = descriptionPart
       .replace(paidInRaw, '')
       .replace(paidOutRaw, '')
@@ -102,7 +162,7 @@ function extractFromPdf(pdfText) {
   return transactions.map(normalizeTransaction);
 }
 
-// ...existing module.exports...
+// Export both parsers
 module.exports = {
   extractFromCsv,
   extractFromPdf
