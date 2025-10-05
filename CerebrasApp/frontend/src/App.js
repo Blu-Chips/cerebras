@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
-import { ChakraProvider, Box, Table, Thead, Tbody, Tr, Th, Td } from '@chakra-ui/react';
+import { ChakraProvider, Box, Table } from '@chakra-ui/react';
+import { Thead, Tbody, Tr, Th, Td } from '@chakra-ui/table';
 
 import FileUpload from './components/FileUpload';
 
