@@ -90,7 +90,11 @@ app.post('/api/cerebras', async (req, res) => {
     }
 
     // Call Cerebras with the final prompt
-    const result = await sendToCerebras({ prompt: finalPrompt });
+    const result = await sendToCerebras({
+      prompt: finalPrompt,
+      max_tokens: 300,        // 👈 add this line
+      temperature: 0.7        // optional
+    });
 
     res.json({
       message: 'Cerebras API call successful',
