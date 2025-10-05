@@ -1,4 +1,8 @@
-require('dotenv').config();               // loads .env
+const path = require('path');
+
+// Load .env from the **CerebrasApp** folder (one level up from backend)
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
+
 const fetch = require('node-fetch');
 
 const CEREBRAS_ENDPOINT = 'https://api.cerebras.ai/v1/transactions'; // <-- adjust if needed
