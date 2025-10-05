@@ -55,4 +55,24 @@ describe('POST /api/cerebras', () => {
 
     expect(res.body.error).toBe('No prompt or transactions provided');
   });
+
+  test('should summarize PDF file', async () => {
+    const mockTransactions = [
+      { description: 'Cash Out', amount: -300, currency: 'KES' },
+      { description: 'Send Money', amount: 2000, currency: 'KES' }
+    ];
+
+    sendToCerebras.mockResolvedValue({
+      choices: [{ text: 'Summary: Net gain of 1700 KES' }],
+      usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 }
+    });
+
+    const res = await request(app)
+      .post('/api/summarize')
+      .attach('file', Buffer.from('%PDF-1.4...'), 'test.pdf')
+      .expect(200);
+
+    expect(res.body.message).toBe('Summary generated successfully');
+    expect(res.body.summary).toContain('Net gain');
+  });
 });
