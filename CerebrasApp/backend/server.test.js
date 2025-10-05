@@ -1,7 +1,6 @@
 const request = require('supertest');
 const app = require('./server');
 
-// Mock sendToCerebras to avoid real API calls
 jest.mock('./utils/cerebrasService', () => ({
   sendToCerebras: jest.fn()
 }));
@@ -50,7 +49,7 @@ describe('POST /api/cerebras', () => {
   test('should return 400 if no prompt or transactions', async () => {
     const res = await request(app)
       .post('/api/cerebras')
-      .send({})
+      .send({}) // No prompt or transactions
       .set('Content-Type', 'application/json')
       .expect(400);
 
