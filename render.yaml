@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: mpesa-analyzer
+    env: node
+    buildCommand: npm run build
+    startCommand: node server.js
+    staticPublishPath: frontend/build
+    envVars:
+      - key: CEREBRAS_API_KEY
+        sync: false
