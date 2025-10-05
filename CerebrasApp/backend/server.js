@@ -4,6 +4,7 @@ const multer = require('multer');
 const { parseCsv } = require('./utils/parseCsv');
 const { extractFromCsv } = require('./utils/extractTransactions');
 const { extractFromPdf } = require('./utils/extractTransactions');
+const { sendToCerebras } = require('./utils/cerebrasService');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -63,6 +64,27 @@ app.post('/api/analyze', upload.single('statement'), async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// New endpoint: POST /api/cerebras
+app.post('/api/cerebras', async (req, res) => {
+  try {
+    // Expect the client to send the same payload format as /api/analyze
+    const { transactions } = req.body;
+
+    if (!Array.isArray(transactions) || transactions.length === 0) {
+      return res.status(400).json({ error: 'No transactions provided' });
+    }
+
+    const cerebrasResult = await sendToCerebras(transactions);
+    res.json({
+      message: 'Cerebras API call successful',
+      cerebrasResult
+    });
+  } catch (err) {
+    console.error('Cerebras integration error:', err);
+    res.status(500).json({ error: err.message });
   }
 });
 
