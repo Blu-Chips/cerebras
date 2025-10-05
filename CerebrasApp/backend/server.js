@@ -108,12 +108,22 @@ app.post('/api/cerebras', async (req, res) => {
 
 app.post('/api/summarize', upload.single('file'), async (req, res) => {
   try {
-    const filePath = req.file?.path;
-    if (!filePath) {
+    if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    const transactions = await parseMpesaStatement(filePath);
+    const { mimetype, buffer } = req.file;
+    let transactions = [];
+
+    if (mimetype === 'application/pdf') {
+      const { parsePdf } = require('./utils/parsePdf');
+      const text = await parsePdf(buffer);
+      transactions = extractFromPdf(text);
+    } else if (mimetype.includes('csv')) {
+      transactions = extractFromCsv(await parseCsv(buffer));
+    } else {
+      return res.status(400).json({ error: 'Unsupported file type' });
+    }
 
     if (!transactions || transactions.length === 0) {
       return res.status(400).json({ error: 'No transactions found' });
