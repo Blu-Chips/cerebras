@@ -143,6 +143,35 @@ app.post('/api/summarize', upload.single('file'), async (req, res) => {
   }
 });
 
+// New endpoint: POST /api/insights
+app.post('/api/insights', async (req, res) => {
+  const { transactions } = req.body;
+
+  if (!transactions || !Array.isArray(transactions)) {
+    return res.status(400).json({ error: 'Invalid transactions array' });
+  }
+
+  const prompt = `Categorize and analyze the following MPESA transactions:\n${transactions.map(t =>
+    `${t.date || 'N/A'}: ${t.description} ${t.amount > 0 ? '+' : ''}${t.amount} ${t.currency}`
+  ).join('\n')}\n\nProvide:
+1. Total income
+2. Total expenses
+3. Net balance
+4. Top 3 categories (e.g., Airtime, Send Money, etc.)
+5. Any possible fraud flags (e.g., unusually large amounts, duplicate entries)
+`;
+
+  try {
+    const result = await sendToCerebras({ prompt, max_tokens: 300 });
+    res.json({
+      message: 'Insights generated',
+      insights: result.choices[0].text.trim()
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 function buildPromptFromTransactions(transactions) {
   const lines = transactions.map(t => {
     const sign = Number(t.amount) < 0 ? '-' : '+';
