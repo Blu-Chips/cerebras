@@ -3,7 +3,7 @@ require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
 const fetch = require('node-fetch');
 
-// Model to use – set CEREBRAS_MODEL in .env or fall back to llama2-70b
+// 👉 Default model – use gpt-oss-120b unless CEREBRAS_MODEL is set in .env
 const MODEL_NAME = process.env.CEREBRAS_MODEL || 'gpt-oss-120b';
 
 // ✅ Correct inference endpoint (OpenAI‑compatible)
