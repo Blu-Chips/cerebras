@@ -106,6 +106,33 @@ app.post('/api/cerebras', async (req, res) => {
   }
 });
 
+app.post('/api/summarize', upload.single('file'), async (req, res) => {
+  try {
+    const filePath = req.file?.path;
+    if (!filePath) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const transactions = await parseMpesaStatement(filePath);
+
+    if (!transactions || transactions.length === 0) {
+      return res.status(400).json({ error: 'No transactions found' });
+    }
+
+    const prompt = buildPromptFromTransactions(transactions);
+    const result = await sendToCerebras({ prompt, max_tokens: 200 });
+
+    res.json({
+      message: 'Summary generated successfully',
+      transactions,
+      summary: result.choices[0].text.trim(),
+    });
+  } catch (err) {
+    console.error('❌ Error in /api/summarize:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Export the app for testing
 module.exports = app;
 

@@ -47,6 +47,7 @@ function App() {
   const [summary, setSummary] = useState({});
   const [selectedModel, setSelectedModel] = useState('llama-4-scout-17b-16e-instruct');
   const [results, setResults] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
@@ -57,6 +58,8 @@ function App() {
 
     const formData = new FormData();
     formData.append('file', file);
+
+    setLoading(true);
 
     try {
       // 1. Send to backend (update endpoint as needed)
@@ -84,6 +87,8 @@ function App() {
       setSummary(summaryResponse.data);
     } catch (error) {
       console.error('Error uploading file:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -102,6 +107,23 @@ function App() {
       link.remove();
     } catch (error) {
       console.error('Error downloading Excel file:', error);
+    }
+  };
+
+  const handleSummarize = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('http://127.0.0.1:5000/api/cerebras', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transactions }),
+      });
+      const data = await res.json();
+      setSummary(data.result.choices[0].text);
+    } catch (err) {
+      alert('Error summarizing');
+    } finally {
+      setLoading(false);
     }
   };
 
