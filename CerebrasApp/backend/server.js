@@ -70,25 +70,27 @@ app.post('/api/analyze', upload.single('statement'), async (req, res) => {
 // New endpoint: POST /api/cerebras
 app.post('/api/cerebras', async (req, res) => {
   try {
-    const { transactions } = req.body;
+    const { transactions, prompt } = req.body;
 
-    // ---- Validation -------------------------------------------------
-    if (!Array.isArray(transactions) || transactions.length === 0) {
-      return res.status(400).json({ error: 'No transactions provided' });
+    let finalPrompt = prompt;
+
+    // If no raw prompt, build one from transactions
+    if (!finalPrompt && Array.isArray(transactions) && transactions.length > 0) {
+      const promptLines = transactions.map(t => {
+        const amount = Number(t.amount).toFixed(2);
+        return `${t.description}: ${amount} ${t.currency}`;
+      });
+      finalPrompt = `Summarize the following MPESA transactions:\n${promptLines.join('\n')}`;
     }
 
-    // ---- Build a concise prompt ------------------------------------
-    const promptLines = transactions.map(t => {
-      const amount = Number(t.amount).toFixed(2);
-      return `${t.description}: ${amount} ${t.currency}`;
-    });
+    // If no prompt at all, return an error
+    if (!finalPrompt) {
+      return res.status(400).json({ error: 'No prompt or transactions provided' });
+    }
 
-    const prompt = `Summarize the following MPESA transactions:\n${promptLines.join('\n')}`;
+    // Call Cerebras with the final prompt
+    const result = await sendToCerebras({ prompt: finalPrompt });
 
-    // ---- Call Cerebras with clean payload ----------------------------
-    const result = await sendToCerebras({ prompt });
-
-    // ---- Return a friendly wrapper -----------------------------------
     res.json({
       message: 'Cerebras API call successful',
       result
