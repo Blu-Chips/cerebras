@@ -5,7 +5,7 @@ require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
 const fetch = require('node-fetch');
 
-const CEREBRAS_ENDPOINT = 'https://api.cerebras.ai/v1/transactions'; // <-- adjust if needed
+const CEREBRAS_ENDPOINT = 'https://api.cerebras.ai/v1/transactions/analyze'; // <-- adjust if needed
 
 /**
  * Sends a list of transactions to the Cerebras API.
