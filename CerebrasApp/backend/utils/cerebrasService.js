@@ -1,7 +1,13 @@
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
-const fetch = require('node-fetch');
+let fetch;
+
+if (typeof jest !== 'undefined') {
+  fetch = global.fetch; // Use mock in tests
+} else {
+  fetch = require('node-fetch'); // Real fetch in production
+}
 
 // ---------------------------------------------------------------------------
 // Configuration

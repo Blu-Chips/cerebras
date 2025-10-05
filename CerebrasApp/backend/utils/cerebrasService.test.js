@@ -1,11 +1,9 @@
+require('jest-fetch-mock').enableMocks(); // ✅ Add this line at the top
 const { sendToCerebras } = require('./cerebrasService');
-
-// Mock node-fetch at the global level
-global.fetch = jest.fn();
 
 describe('cerebrasService', () => {
   beforeEach(() => {
-    fetch.mockClear();
+    fetch.resetMocks();
   });
 
   test('should call Cerebras API and return parsed JSON', async () => {
@@ -15,10 +13,7 @@ describe('cerebrasService', () => {
       usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 }
     };
 
-    fetch.mockResolvedValue({
-      ok: true,
-      json: async () => mockResponse
-    });
+    fetch.mockResponseOnce(JSON.stringify(mockResponse));
 
     const result = await sendToCerebras({
       prompt: 'Summarize: Cash Out -300 KES, Send Money 2000 KES',
@@ -30,11 +25,7 @@ describe('cerebrasService', () => {
   });
 
   test('should throw error if API returns non-2xx status', async () => {
-    fetch.mockResolvedValue({
-      ok: false,
-      text: async () => 'Invalid request',
-      status: 400
-    });
+    fetch.mockResponseOnce('Invalid request', { status: 400 });
 
     await expect(
       sendToCerebras({ prompt: 'bad prompt' })
