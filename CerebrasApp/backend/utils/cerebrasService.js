@@ -7,7 +7,7 @@ const fetch = require('node-fetch');
 // Configuration
 // ---------------------------------------------------------------------------
 // Default model – can be overridden by setting CEREBRAS_MODEL in .env
-const MODEL_NAME = process.env.CEREBRAS_MODEL || 'gpt-oss-120b';
+const MODEL_NAME = process.env.CEREBRAS_MODEL || 'qwen-3-coder-480b';
 
 // Cerebras inference endpoint (OpenAI‑compatible)
 const CEREBRAS_ENDPOINT = 'https://api.cerebras.ai/v1/completions';
