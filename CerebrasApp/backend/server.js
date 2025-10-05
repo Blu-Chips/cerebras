@@ -106,6 +106,21 @@ app.post('/api/cerebras', async (req, res) => {
   }
 });
 
+// Export the app for testing
+module.exports = app;
+
+// Start server only if this file is run directly (not imported)
+if (require.main === module) {
+  const PORT = process.env.PORT || 5000;
+  const HOST = process.env.HOST || '127.0.0.1';
+
+  app.listen(PORT, HOST, () => {
+    console.log(`✅ Backend running on http://${HOST}:${PORT}`);
+  }).on('error', (err) => {
+    console.error('Server failed to start:', err);
+  });
+}
+
 // Error handler
 app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {
