@@ -3,16 +3,27 @@ require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
 const fetch = require('node-fetch');
 
-// 👉 Default model – use gpt-oss-120b unless CEREBRAS_MODEL is set in .env
+// ---------------------------------------------------------------------------
+// Configuration
+// ---------------------------------------------------------------------------
+// Default model – can be overridden by setting CEREBRAS_MODEL in .env
 const MODEL_NAME = process.env.CEREBRAS_MODEL || 'gpt-oss-120b';
 
-// ✅ Correct inference endpoint (OpenAI‑compatible)
+// Cerebras inference endpoint (OpenAI‑compatible)
 const CEREBRAS_ENDPOINT = 'https://api.cerebras.ai/v1/completions';
 
+// ---------------------------------------------------------------------------
+// Public function – sends a prompt (or any payload) to Cerebras
+// ---------------------------------------------------------------------------
 /**
- * Sends a prompt (or chat messages) to the Cerebras inference API.
- * @param {Object} payload – must contain either `prompt` (string) or `messages` (array) **and** `model`.
- * @returns {Promise<Object>} – parsed JSON response from Cerebras.
+ * Calls the Cerebras completions endpoint.
+ *
+ * @param {Object} payload  Must contain at least a `prompt` string.
+ *                         Additional OpenAI‑compatible fields (max_tokens,
+ *                         temperature, …) are allowed.
+ * @returns {Promise<Object>} Parsed JSON response from Cerebras.
+ *
+ * @throws {Error} If the API key is missing or the request fails.
  */
 async function sendToCerebras(payload) {
   const apiKey = process.env.CEREBRAS_API_KEY;
@@ -20,10 +31,10 @@ async function sendToCerebras(payload) {
     throw new Error('CEREBRAS_API_KEY is missing from .env');
   }
 
-  // Ensure the model name is present in the payload
+  // Ensure the model name is always present
   const body = {
     model: MODEL_NAME,
-    ...payload               // e.g. { prompt: "...", max_tokens: 200 }
+    ...payload,
   };
 
   console.log(`🔎 Sending request to model "${MODEL_NAME}"`);
@@ -32,17 +43,25 @@ async function sendToCerebras(payload) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
+      // The same key works for all Cerebras services (inference included)
+      Authorization: `Bearer ${apiKey}`,
     },
-    body: JSON.stringify(body)
+    body: JSON.stringify(body),
   });
 
+  // --------------------------------------------------------------
+  // Error handling – surface the exact message Cerebras returns
+  // --------------------------------------------------------------
   if (!response.ok) {
     const errText = await response.text();
     throw new Error(`Cerebras API error ${response.status}: ${errText}`);
   }
 
+  // --------------------------------------------------------------
+  // Success – return the parsed JSON
+  // --------------------------------------------------------------
   return response.json();
 }
 
+// Export the helper for use in server.js
 module.exports = { sendToCerebras };
