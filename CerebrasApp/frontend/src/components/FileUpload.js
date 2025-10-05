@@ -5,9 +5,9 @@ import {
   Button,
   VStack,
   Text,
-  Icon,
-  useColorModeValue
+  Icon
 } from '@chakra-ui/react';
+import { useColorModeValue } from '@chakra-ui/system';
 import { FiUpload } from 'react-icons/fi';
 
 function FileUpload({ onUpload, accept, disabled }) {
