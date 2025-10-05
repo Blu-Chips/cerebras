@@ -2,13 +2,9 @@ services:
   - type: web
     name: mpesa-analyzer
     env: node
-    buildCommand: npm run build
+    buildCommand: cd frontend && npm install && npm run build   # ✅ Updated
     startCommand: node server.js
     staticPublishPath: frontend/build
     envVars:
       - key: CEREBRAS_API_KEY
-        sync: false
-      - key: SUPABASE_URL
-        sync: false
-      - key: SUPABASE_KEY
         sync: false
