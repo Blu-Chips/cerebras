@@ -178,13 +178,3 @@ app.use((err, req, res, next) => {
   console.error(err);
   res.status(500).json({ error: err.message });
 });
-
-// Start server (this will now work)
-const server = app.listen(PORT, '127.0.0.1', () => {
-  console.log(`✅ Backend running on http://127.0.0.1:${PORT}`);
-});
-
-// Add error logging
-server.on('error', (err) => {
-  console.error('Server failed to start:', err);
-});
