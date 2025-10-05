@@ -70,17 +70,28 @@ app.post('/api/analyze', upload.single('statement'), async (req, res) => {
 // New endpoint: POST /api/cerebras
 app.post('/api/cerebras', async (req, res) => {
   try {
-    // Expect the client to send the same payload format as /api/analyze
     const { transactions } = req.body;
 
+    // ---- Validation -------------------------------------------------
     if (!Array.isArray(transactions) || transactions.length === 0) {
       return res.status(400).json({ error: 'No transactions provided' });
     }
 
-    const cerebrasResult = await sendToCerebras(transactions);
+    // ---- Build a concise prompt ------------------------------------
+    const promptLines = transactions.map(t => {
+      const amount = Number(t.amount).toFixed(2);
+      return `${t.description}: ${amount} ${t.currency}`;
+    });
+
+    const prompt = `Summarize the following MPESA transactions:\n${promptLines.join('\n')}`;
+
+    // ---- Call Cerebras with clean payload ----------------------------
+    const result = await sendToCerebras({ prompt });
+
+    // ---- Return a friendly wrapper -----------------------------------
     res.json({
       message: 'Cerebras API call successful',
-      cerebrasResult
+      result
     });
   } catch (err) {
     console.error('Cerebras integration error:', err);
