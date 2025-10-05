@@ -1,12 +1,17 @@
-function extractFromPdf(text) {
+function extractTransactions(text, bankType) {
   const lines = text.split('\n');
   const transactions = [];
 
-  // Updated regex to capture date
-  const transactionRegex = /(\d{4}-\d{2}-\d{2})\s+(.*?)\s+([+-]?\d+(?:\.\d+)?)\s+(KES)/g;
-  let match;
+  let regex;
+  if (bankType === 'mpesa') {
+    regex = /(\d{4}-\d{2}-\d{2})\s+(.*?)\s+([+-]?\d+(?:\.\d+)?)\s+(KES)/g;
+  } else {
+    // Add more bank formats here
+    regex = /(\d{4}-\d{2}-\d{2})\s+(.*?)\s+([+-]?\d+(?:\.\d+)?)\s+(\w{3})/g; // Generic
+  }
 
-  while ((match = transactionRegex.exec(text)) !== null) {
+  let match;
+  while ((match = regex.exec(text)) !== null) {
     transactions.push({
       date: match[1],
       description: match[2].trim(),
@@ -17,3 +22,5 @@ function extractFromPdf(text) {
 
   return transactions;
 }
+
+module.exports = { extractTransactions };
