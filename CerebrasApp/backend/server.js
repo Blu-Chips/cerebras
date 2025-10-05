@@ -143,6 +143,16 @@ app.post('/api/summarize', upload.single('file'), async (req, res) => {
   }
 });
 
+function buildPromptFromTransactions(transactions) {
+  const lines = transactions.map(t => {
+    const sign = Number(t.amount) < 0 ? '-' : '+';
+    const absAmount = Math.abs(Number(t.amount)).toFixed(2);
+    return `${t.description} ${sign}${absAmount} ${t.currency}`;
+  });
+
+  return `Summarize the following MPESA transactions:\n${lines.join('\n')}`;
+}
+
 // Export the app for testing
 module.exports = app;
 
