@@ -37,6 +37,8 @@ async function sendToCerebras(payload) {
     ...payload,
   };
 
+  console.log('📤 Cerebras payload:', JSON.stringify(body, null, 2));  // <-- add this
+
   console.log(`🔎 Sending request to model "${MODEL_NAME}"`);
 
   const response = await fetch(CEREBRAS_ENDPOINT, {
