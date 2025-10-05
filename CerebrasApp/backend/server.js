@@ -112,15 +112,19 @@ app.post('/api/summarize', upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    const { mimetype, buffer } = req.file;
+    const { mimetype, buffer, originalname } = req.file;
     let transactions = [];
+
+    // Detect bank type from filename or content
+    const bankType = detectBankType(originalname, buffer.toString());
 
     if (mimetype === 'application/pdf') {
       const { parsePdf } = require('./utils/parsePdf');
       const text = await parsePdf(buffer);
-      transactions = extractFromPdf(text);
+      transactions = extractTransactions(text, bankType);
     } else if (mimetype.includes('csv')) {
-      transactions = extractFromCsv(await parseCsv(buffer));
+      const text = await parseCsv(buffer);
+      transactions = extractTransactions(text, bankType);
     } else {
       return res.status(400).json({ error: 'Unsupported file type' });
     }
@@ -134,6 +138,7 @@ app.post('/api/summarize', upload.single('file'), async (req, res) => {
 
     res.json({
       message: 'Summary generated successfully',
+      bank: bankType,
       transactions,
       summary: result.choices[0].text.trim(),
     });
@@ -180,6 +185,15 @@ function buildPromptFromTransactions(transactions) {
   });
 
   return `Summarize the following MPESA transactions:\n${lines.join('\n')}`;
+}
+
+// Helper to detect bank
+function detectBankType(filename, text) {
+  if (filename.toLowerCase().includes('mpesa') || text.includes('MPESA')) {
+    return 'mpesa';
+  }
+  // Add more bank detectors
+  return 'generic';
 }
 
 // Export the app for testing

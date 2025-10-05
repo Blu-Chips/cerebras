@@ -3,11 +3,18 @@ function extractTransactions(text, bankType) {
   const transactions = [];
 
   let regex;
-  if (bankType === 'mpesa') {
-    regex = /(\d{4}-\d{2}-\d{2})\s+(.*?)\s+([+-]?\d+(?:\.\d+)?)\s+(KES)/g;
-  } else {
-    // Add more bank formats here
-    regex = /(\d{4}-\d{2}-\d{2})\s+(.*?)\s+([+-]?\d+(?:\.\d+)?)\s+(\w{3})/g; // Generic
+  switch (bankType) {
+    case 'mpesa':
+      regex = /(\d{4}-\d{2}-\d{2})\s+(.*?)\s+([+-]?\d+(?:\.\d+)?)\s+(KES)/g;
+      break;
+    case 'equity':
+      regex = /(\d{2}\/\d{2}\/\d{4})\s+(.*?)\s+([+-]?\d+(?:\.\d+)?)\s+(KES)/g;
+      break;
+    case 'kcb':
+      regex = /(\d{2}\/\d{2}\/\d{4})\s+(.*?)\s+([+-]?\d+(?:\.\d+)?)\s+(KES)/g;
+      break;
+    default:
+      regex = /(\d{4}[-\/]\d{2}[-\/]\d{2})\s+(.*?)\s+([+-]?\d+(?:\.\d+)?)\s+(\w{3})/g;
   }
 
   let match;
