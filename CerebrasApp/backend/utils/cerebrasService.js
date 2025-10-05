@@ -5,7 +5,8 @@ require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
 const fetch = require('node-fetch');
 
-const CEREBRAS_ENDPOINT = 'https://api.cerebras.ai/v1/transactions/analyze'; // <-- adjust if needed
+// ✅ Correct endpoint – replace with the one from Cerebras docs
+const CEREBRAS_ENDPOINT = 'https://api.cerebras.ai/v1/transactions/analyze';
 
 /**
  * Sends a list of transactions to the Cerebras API.
@@ -18,6 +19,9 @@ async function sendToCerebras(transactions) {
     throw new Error('CEREBRAS_API_KEY is missing from .env');
   }
 
+  // DEBUG – show the payload size (remove in production)
+  console.log('🔎 Sending', transactions.length, 'transactions to Cerebras');
+
   const response = await fetch(CEREBRAS_ENDPOINT, {
     method: 'POST',
     headers: {
@@ -29,6 +33,7 @@ async function sendToCerebras(transactions) {
 
   if (!response.ok) {
     const errText = await response.text();
+    // Propagate the exact error from Cerebras
     throw new Error(`Cerebras API error ${response.status}: ${errText}`);
   }
 
