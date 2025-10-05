@@ -69,6 +69,7 @@ app.post('/api/analyze', upload.single('statement'), async (req, res) => {
 
 // New endpoint: POST /api/cerebras
 app.post('/api/cerebras', async (req, res) => {
+  console.log('📥 /api/cerebras called with body:', req.body);  // <-- add this line
   try {
     const { transactions, prompt } = req.body;
 
