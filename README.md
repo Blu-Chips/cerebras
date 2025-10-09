@@ -1,6 +1,7 @@
-# Cerebras Bank Statement Analyzer
 
-A SaaS web application that allows users to upload PDF bank statements, convert them to Excel format, and get AI-powered financial advice using Cerebras.ai and OpenRouter.
+# Cerebras Bank Statement Analyzer (Monorepo)
+
+This repository contains the full-stack SaaS web application for analyzing bank statements, now organized with all code at the root level. Users can upload PDF bank statements, convert them to Excel, and get AI-powered financial advice using Cerebras.ai and OpenRouter.
 
 ## Features
 
@@ -21,6 +22,7 @@ A SaaS web application that allows users to upload PDF bank statements, convert 
 - **Payments**: Stripe
 - **Deployment**: Docker containerization
 
+
 ## Setup Instructions
 
 1. **Install Dependencies**:
@@ -30,11 +32,11 @@ A SaaS web application that allows users to upload PDF bank statements, convert 
    ```
 
 2. **Configure Environment Variables**:
-   Update the `.env` file with your API keys:
-   - Cerebras API key
-   - OpenRouter API key
-   - Supabase URL and Key
-   - Stripe Secret Key
+   Create a `.env` file in the root directory (see `DEPLOYMENT.md` for details) and add your API keys:
+   - CEREBRAS_API_KEY
+   - OPENROUTER_API_KEY
+   - SUPABASE_URL, SUPABASE_KEY
+   - STRIPE_SECRET_KEY
 
 3. **Run with Docker**:
    ```bash
@@ -45,10 +47,11 @@ A SaaS web application that allows users to upload PDF bank statements, convert 
    ```bash
    # Start backend
    python main.py
-   
+
    # In another terminal, start frontend
    cd frontend && npm start
    ```
+
 
 ## API Endpoints
 
@@ -67,6 +70,7 @@ A SaaS web application that allows users to upload PDF bank statements, convert 
 - `POST /analyze-transactions/` - Analyze transactions with AI
 - `GET /transaction-summary/` - Get transaction summary
 
+
 ## Credit System
 
 - New users get 1 free credit
@@ -76,10 +80,16 @@ A SaaS web application that allows users to upload PDF bank statements, convert 
 
 Each statement analysis consumes 1 credit.
 
+
 ## Security Features
 
 - User authentication with Supabase
 - Data encryption for sensitive information
 - Secure payment processing with Stripe
 - GDPR and CCPA compliance measures
+
 - Input validation and sanitization
+
+---
+
+**Note:** This repository was reorganized in October 2025. All code is now at the root. If you are looking for the legacy SDK or previous structure, see the `archive/` directory.

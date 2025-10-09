@@ -138,7 +138,7 @@ docker-compose exec redis redis-cli SAVE
 2. Volume Backups:
 ```bash
 # Backup volumes
-docker run --rm -v cerebrasapp_redis_data:/data -v /backup:/backup alpine tar czf /backup/redis-data.tar.gz /data
+docker run --rm -v redis_data:/data -v /backup:/backup alpine tar czf /backup/redis-data.tar.gz /data
 ```
 
 ## Troubleshooting
@@ -180,7 +180,7 @@ docker-compose up -d
 ```bash
 # Restore Redis backup
 docker-compose down
-docker run --rm -v cerebrasapp_redis_data:/data -v /backup:/backup alpine sh -c "cd /data && tar xzf /backup/redis-data.tar.gz --strip 1"
+docker run --rm -v redis_data:/data -v /backup:/backup alpine sh -c "cd /data && tar xzf /backup/redis-data.tar.gz --strip 1"
 docker-compose up -d
 ```
 
